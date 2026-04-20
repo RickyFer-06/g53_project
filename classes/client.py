@@ -4,15 +4,16 @@ class Client(Gclass):
     obj = dict()
     lst = list()
     pos = 0
-    sortkey = ''
-    auto_number = 0
-    nkey = 1
 
-    def __init__(self, id, name, email):
+    att = ['_id', '_name', '_address'] 
+
+    def __init__(self, id, name, address):
         super().__init__()
         self.id = id
         self.name = name
-        self.email = email
+        self.address = address
+        Client.obj[self.id] = self
+        Client.lst.append(self.id)
 
     @property
     def id(self):
@@ -31,15 +32,15 @@ class Client(Gclass):
         self._name = str(value)
 
     @property
-    def email(self):
-        return self._email
+    def address(self):
+        return self._address
 
-    @email.setter
-    def email(self, value):
-        self._email = str(value)
+    @address.setter
+    def address(self, value):
+        self._address = str(value)
 
     def __str__(self):
-        return f"{self.id};{self.name};{self.email}"
+        return f"{self.id};{self.name};{self.address}"
 
     @classmethod
     def from_string(cls, string_data):

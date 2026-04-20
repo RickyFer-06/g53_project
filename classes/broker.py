@@ -4,9 +4,7 @@ class Broker(Gclass):
     obj = dict()
     lst = list()
     pos = 0
-    sortkey = ''
-    auto_number = 0
-    nkey = 1
+    att = ['_id', '_name', '_license_number', '_corporation_id']
 
     def __init__(self, id, name, license_number, corporation_id):
         super().__init__()
@@ -14,6 +12,8 @@ class Broker(Gclass):
         self.name = name
         self.license_number = license_number
         self.corporation_id = corporation_id
+        Broker.obj[self.id] = self
+        Broker.lst.append(self.id)
 
     @property
     def id(self):
@@ -53,4 +53,5 @@ class Broker(Gclass):
     @classmethod
     def from_string(cls, string_data):
         parts = string_data.split(';')
+        # Se os dados vierem da BD como strings, o int() garante que ficam no tipo certo
         return cls(int(parts[0]), parts[1], int(parts[2]), int(parts[3]))
