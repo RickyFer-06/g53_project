@@ -1,9 +1,9 @@
 # Escolhe apenas UM destes blocos para descomentar de cada vez:
 
 # --- TESTE CORPORATION ---
-#from classes.corporation import Corporation
-#test_class = Corporation
-#b = '1;Empresa XPTO;Sem comentarios' # Dados exemplo para o "Insert" inicial
+from classes.corporation import Corporation
+test_class = Corporation
+ob = '1;Empresa XPTO;Sem comentarios' # Dados exemplo para o "Insert" inicial
 
 # --- TESTE BROKER ---
 #from classes.broker import Broker
@@ -11,9 +11,9 @@
 #ob = '1;Nome do Corretor;12345;1'
 
 # --- TESTE CLIENT ---
-from classes.client import Client
-test_class = Client
-ob = '1;Nome do Cliente;Rua ABC'
+#from classes.client import Client
+#test_class = Client
+#ob = '1;Nome do Cliente;Rua ABC'
 
 # --- TESTE TRADE ---
 #from classes.trade import Trade

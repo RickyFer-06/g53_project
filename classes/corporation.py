@@ -4,13 +4,13 @@ class Corporation(Gclass):
     obj = dict()
     lst = list()
     pos = 0
-    att = ['_id', '_name', '_nif'] 
+    att = ['_id', '_name', '_comments'] 
 
-    def __init__(self, id, name, nif):
+    def __init__(self, id, name, comments):
         super().__init__()
         self.id = id
         self.name = name
-        self.nif = nif
+        self.comments = comments
         Corporation.obj[self.id] = self
         Corporation.lst.append(self.id)
 
@@ -31,16 +31,16 @@ class Corporation(Gclass):
         self._name = str(value)
 
     @property
-    def nif(self):
-        return self._nif
+    def comments(self):
+        return self._comments
 
-    @nif.setter
-    def nif(self, value):
-        self._nif = str(value)
+    @comments.setter
+    def comments(self, value):
+        self._comments = str(value)
 
     # O método __str__ e from_string que já tinhas estão corretos
     def __str__(self):
-        return f"{self.id};{self.name};{self.nif}"
+        return f"{self.id};{self.name};{self.comments}"
 
     @classmethod
     def from_string(cls, string_data):
