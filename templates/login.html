@@ -28,13 +28,7 @@
                 <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Voltar ao Início</a>
             </div>
             <div class="text-center mt-3">
-                <small class="text-muted">Acesso admin: Utilizador <b>admin</b> | Palavra-passe <b>admin</b></small><br>
-                <small class="text-muted">Acesso corporation (teste): Utilizador <b>corp</b> | Palavra-passe
-                    <b>corp</b></small><br>
-                <small class="text-muted">Acesso broker (teste): Utilizador <b>broker</b> | Palavra-passe
-                    <b>broker</b></small><br>
-                <small class="text-muted">Acesso cliente (teste): Utilizador <b>client</b> | Palavra-passe
-                    <b>client</b></small>
+                <small class="text-muted">Não tem conta? <a href="{{ url_for('register') }}">Registar como cliente</a></small>
             </div>
         </form>
         {% if resul %}

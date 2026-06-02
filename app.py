@@ -1,18 +1,23 @@
 import os
 import re
+import secrets
+from functools import wraps
+from datetime import datetime
+
 import pandas as pd
 import plotly.express as px
 import plotly.io as pio
-from datetime import datetime
 
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 from classes.corporation import Corporation
 from classes.client import Client
 from classes.broker import Broker
 from classes.trade import Trade
+from classes.userlogin import Userlogin
 
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'g53-projeto-chave-secreta-2025')
 
 @app.template_filter('moeda')
 def moeda_filter(value):
@@ -21,8 +26,31 @@ def moeda_filter(value):
 db_path = os.path.join(os.path.dirname(__file__), 'data/business.db')
 Corporation.read(db_path)
 Broker.read(db_path)
-Client.read(db_path)  
+Client.read(db_path)
 Trade.read(db_path)
+Userlogin.read(db_path)
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('user_login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def require_role(*roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if 'user_id' not in session:
+                return redirect(url_for('user_login'))
+            if session.get('usergroup') not in roles:
+                return redirect(url_for('user_login'))
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
 
 @app.route('/')
 def home():
@@ -38,24 +66,167 @@ def user_login():
 
 @app.route('/chklogin', methods=['POST'])
 def chklogin():
-    user = request.form.get('user')
-    password = request.form.get('password')
-    
-    if user == 'admin' and password == 'admin':
+    user = request.form.get('user', '').strip()
+    password = request.form.get('password', '')
+
+    result = Userlogin.chk_password(user, password)
+    if result != 'Valid':
+        return render_template('login.html', user=user, password='', resul='Credenciais inválidas. Tente novamente.')
+
+    user_id = Userlogin.user_id
+    u = Userlogin.obj[user_id]
+
+    session['user_id'] = u.id
+    session['username'] = u.user
+    session['usergroup'] = u.usergroup
+    session['entity_id'] = u.entity_id
+
+    if u.usergroup == 'admin':
         return redirect(url_for('admin'))
-    elif user == 'corp' and password == 'corp':
-        primeira_corp = Corporation.lst[0] if Corporation.lst else 1
-        return redirect(url_for('corporation_dashboard', id=primeira_corp))
-    elif user == 'broker' and password == 'broker':
-        primeiro_broker = Broker.lst[0] if Broker.lst else 1
-        return redirect(url_for('broker_dashboard', id=primeiro_broker))
-    elif user == 'client' and password == 'client':
-        primeiro_cliente = Client.lst[0] if Client.lst else 1
-        return redirect(url_for('cliente_dashboard', id=primeiro_cliente))
+    elif u.usergroup == 'corp':
+        if u.entity_id == 0:
+            return redirect(url_for('select_entity', tipo='corp'))
+        return redirect(url_for('corporation_dashboard', id=u.entity_id))
+    elif u.usergroup == 'broker':
+        if u.entity_id == 0:
+            return redirect(url_for('select_entity', tipo='broker'))
+        return redirect(url_for('broker_dashboard', id=u.entity_id))
+    elif u.usergroup == 'client':
+        if u.entity_id == 0:
+            return redirect(url_for('select_entity', tipo='client'))
+        return redirect(url_for('cliente_dashboard', id=u.entity_id))
     else:
-        return render_template('login.html', user=user, password='', resul='Credenciais inválidas. Tente novamente!')
+        return redirect(url_for('index'))
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('user_login'))
+
+
+@app.route('/select/<tipo>')
+@login_required
+def select_entity(tipo):
+    usergroup = session.get('usergroup')
+    if usergroup not in ('corp', 'broker', 'client') or session.get('entity_id') != 0:
+        return redirect(url_for('user_login'))
+
+    if tipo == 'corp':
+        entidades = sorted(
+            [{'id': c.id, 'name': c.name} for c in Corporation.obj.values()],
+            key=lambda x: x['name'].lower()
+        )
+        label = 'Corporação'
+    elif tipo == 'broker':
+        entidades = sorted(
+            [{'id': b.id, 'name': b.name} for b in Broker.obj.values()],
+            key=lambda x: x['name'].lower()
+        )
+        label = 'Corretor'
+    elif tipo == 'client':
+        entidades = sorted(
+            [{'id': c.id, 'name': c.name} for c in Client.obj.values()],
+            key=lambda x: x['name'].lower()
+        )
+        label = 'Cliente'
+    else:
+        return redirect(url_for('user_login'))
+
+    return render_template('select_entity.html', tipo=label, tipo_key=tipo, entidades=entidades)
+
+
+@app.route('/select/go', methods=['POST'])
+@login_required
+def select_entity_post():
+    if session.get('entity_id') != 0:
+        return redirect(url_for('user_login'))
+
+    tipo = request.form.get('tipo')
+    entity_id = int(request.form.get('entity_id', 0))
+
+    if tipo == 'corp':
+        return redirect(url_for('corporation_dashboard', id=entity_id))
+    elif tipo == 'broker':
+        return redirect(url_for('broker_dashboard', id=entity_id))
+    elif tipo == 'client':
+        return redirect(url_for('cliente_dashboard', id=entity_id))
+    return redirect(url_for('user_login'))
+
+
+SUPERVISOR_CODE = 'PCII_supervisor'
+ADMIN_CODE = 'PCII_admin'
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'GET':
+        return render_template('register.html', erro='')
+
+    def err(msg):
+        return render_template('register.html', erro=msg)
+
+    role = request.form.get('role', '').strip()
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
+    confirm = request.form.get('confirm', '').strip()
+    access_code = request.form.get('access_code', '').strip()
+
+    if not role or not username or not password:
+        return err('Preenche todos os campos obrigatórios.')
+    if password != confirm:
+        return err('As passwords não coincidem.')
+    if len(password) < 6:
+        return err('A password deve ter pelo menos 6 caracteres.')
+    if Userlogin.get_user_id(username) != 0:
+        return err('Este nome de utilizador já existe.')
+
+    if role == 'admin':
+        if access_code != ADMIN_CODE:
+            return err('Código de administrador inválido.')
+        usergroup = 'admin'
+        entity_id = 0
+    elif role in ('corp', 'broker', 'client_sup'):
+        if access_code != SUPERVISOR_CODE:
+            return err('Código de supervisão inválido.')
+        usergroup = 'client' if role == 'client_sup' else role
+        entity_id = 0
+    elif role == 'client':
+        name = request.form.get('name', '').strip()
+        address = request.form.get('address', '').strip()
+        if not name or not address:
+            return err('Nome e morada são obrigatórios para conta de cliente.')
+        new_client_id = max(Client.lst) + 1 if Client.lst else 1
+        Client(new_client_id, name, address)
+        Client.insert(new_client_id)
+        usergroup = 'client'
+        entity_id = new_client_id
+    else:
+        return err('Tipo de conta inválido.')
+
+    new_user_id = max(Userlogin.lst) + 1 if Userlogin.lst else 1
+    hashed = Userlogin.set_password(password)
+    Userlogin(new_user_id, username, usergroup, hashed, entity_id)
+    Userlogin.insert(new_user_id)
+
+    session['user_id'] = new_user_id
+    session['username'] = username
+    session['usergroup'] = usergroup
+    session['entity_id'] = entity_id
+
+    if usergroup == 'admin':
+        return redirect(url_for('admin'))
+    elif usergroup == 'corp':
+        return redirect(url_for('select_entity', tipo='corp'))
+    elif usergroup == 'broker':
+        return redirect(url_for('select_entity', tipo='broker'))
+    elif usergroup == 'client' and entity_id == 0:
+        return redirect(url_for('select_entity', tipo='client'))
+    else:
+        return redirect(url_for('cliente_dashboard', id=entity_id))
 
 @app.route('/admin')
+@require_role('admin')
 def admin():
     corps = sorted((Corporation.obj[id] for id in Corporation.lst), key=lambda c: c.name.lower())
     brokers = sorted((Broker.obj[id] for id in dict.fromkeys(Broker.lst)), key=lambda b: b.name.lower())
@@ -86,6 +257,7 @@ def admin():
                            lista_clients=clients)
 
 @app.route('/admin/corporation/add', methods=['POST'])
+@require_role('admin')
 def admin_add_corporation():
     name = (request.form.get('name') or '').strip()
     comments = (request.form.get('comments') or '').strip()
@@ -99,6 +271,7 @@ def admin_add_corporation():
     return redirect(url_for('admin'))
 
 @app.route('/admin/corporation/remove', methods=['POST'])
+@require_role('admin')
 def admin_remove_corporation():
     corp_id = request.form.get('corp_id')
     if not corp_id:
@@ -123,6 +296,7 @@ def admin_remove_corporation():
     return redirect(url_for('admin'))
 
 @app.route('/admin/broker/add', methods=['POST'])
+@require_role('admin')
 def admin_add_broker():
     name = (request.form.get('name') or '').strip()
     license_number = request.form.get('license_number')
@@ -145,6 +319,7 @@ def admin_add_broker():
     return redirect(url_for('admin'))
 
 @app.route('/admin/broker/remove', methods=['POST'])
+@require_role('admin')
 def admin_remove_broker():
     broker_id = request.form.get('broker_id')
     if not broker_id:
@@ -164,6 +339,7 @@ def admin_remove_broker():
     return redirect(url_for('admin'))
 
 @app.route('/admin/client/add', methods=['POST'])
+@require_role('admin')
 def admin_add_client():
     name = (request.form.get('name') or '').strip()
     address = (request.form.get('address') or '').strip()
@@ -177,6 +353,7 @@ def admin_add_client():
     return redirect(url_for('admin'))
 
 @app.route('/admin/client/remove', methods=['POST'])
+@require_role('admin')
 def admin_remove_client():
     client_id = request.form.get('client_id')
     if not client_id:
@@ -196,7 +373,12 @@ def admin_remove_client():
     return redirect(url_for('admin'))
 
 @app.route('/corporation/<int:id>/dashboard')
+@login_required
 def corporation_dashboard(id):
+    ug = session.get('usergroup')
+    eid = session.get('entity_id')
+    if ug != 'admin' and not (ug == 'corp' and (eid == 0 or eid == id)):
+        return redirect(url_for('user_login'))
     if id not in Corporation.obj:
         return "Erro: Corporação não encontrada!", 404
     
@@ -272,6 +454,7 @@ def corporation_dashboard(id):
                            brokers=broker_stats)
 
 @app.route('/corporation/close_account', methods=['POST'])
+@require_role('corp', 'admin')
 def close_corporation_account():
     corp_id = request.form.get('corp_id')
     if not corp_id:
@@ -301,11 +484,16 @@ def close_corporation_account():
 
     # 4. Finalmente, apagar a Corporação e redirecionar para a página inicial
     Corporation.remove(corp_id)
-    
+    session.clear()
     return redirect(url_for('index'))
 
 @app.route('/broker/<int:id>/dashboard')
+@login_required
 def broker_dashboard(id):
+    ug = session.get('usergroup')
+    eid = session.get('entity_id')
+    if ug != 'admin' and not (ug == 'broker' and (eid == 0 or eid == id)):
+        return redirect(url_for('user_login'))
     if id not in Broker.obj:
         return "Erro: Broker não encontrado!", 404
     
@@ -390,6 +578,7 @@ def broker_dashboard(id):
                            clientes_disponiveis=clientes_disponiveis)
 
 @app.route('/broker/close_account', methods=['POST'])
+@require_role('broker', 'admin')
 def broker_close_account():
     broker_id = int(request.form.get('broker_id'))
     
@@ -424,10 +613,11 @@ def broker_close_account():
         del Broker.obj[broker_id]
 
     Broker.sqlexe(f"DELETE FROM Broker WHERE id={broker_id}")
-
+    session.clear()
     return redirect(url_for('index'))
 
 @app.route('/broker/manage_client', methods=['POST'])
+@require_role('broker', 'admin')
 def manage_client():
     broker_id = int(request.form.get('broker_id'))
     client_id = int(request.form.get('client_id'))
@@ -456,7 +646,12 @@ def manage_client():
 
 
 @app.route('/cliente/<int:id>/dashboard')
+@login_required
 def cliente_dashboard(id):
+    ug = session.get('usergroup')
+    eid = session.get('entity_id')
+    if ug != 'admin' and not (ug == 'client' and (eid == 0 or eid == id)):
+        return redirect(url_for('user_login'))
     if id not in Client.obj:
         return "Erro: Cliente não encontrado!", 404
 
@@ -519,6 +714,7 @@ def cliente_dashboard(id):
                            graph_html=graph_html)
     
 @app.route('/cliente/close_account', methods=['POST'])
+@require_role('client', 'admin')
 def close_account():
     client_id = int(request.form.get('client_id'))
     
@@ -549,11 +745,11 @@ def close_account():
         del Client.obj[client_id]
         
     Client.sqlexe(f"DELETE FROM Client WHERE id={client_id}")
-    
-    # Redirecionar para a Home Page após sucesso
-    return redirect(url_for('index')) 
+    session.clear()
+    return redirect(url_for('index'))
 
 @app.route('/trade/new', methods=['POST'])
+@require_role('client', 'admin')
 def new_trade():
     client_id = int(request.form.get('client_id'))
     broker_id = int(request.form.get('broker_id'))
