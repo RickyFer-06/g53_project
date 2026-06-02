@@ -684,7 +684,7 @@ def cliente_dashboard(id):
 
     df_all = pd.DataFrame(trades_data)
     total_investido = df_all['amount'].sum() if not df_all.empty else 0
-    total_negocios = len(df_all)
+    total_negocios = len(df_all[df_all['amount'] != 0]) if not df_all.empty else 0
     
     if not df_all.empty:
         df_grouped = df_all.groupby('broker_name')['amount'].sum().reset_index()
