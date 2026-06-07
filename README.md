@@ -3,14 +3,17 @@
 Aplicação web de gestão de corretores, clientes e transações financeiras,
 desenvolvida no âmbito da unidade curricular de PCII.
 
-## Credenciais de Acesso
+## Acesso
 
-| Utilizador | Password | Acesso                          |
-|------------|----------|---------------------------------|
-| admin      | admin    | Portal de administração completo |
-| corp       | corp     | Dashboard da primeira corporação |
-| broker     | broker   | Dashboard do primeiro corretor   |
-| client     | client   | Dashboard do primeiro cliente    |
+O sistema usa autenticação por sessão Flask com passwords encriptadas em bcrypt.
+
+Para criar uma conta, acede a `/register` e escolhe o tipo:
+
+| Tipo de conta | Código necessário | Acesso |
+|---|---|---|
+| Cliente | — | Dashboard do próprio cliente |
+| Supervisor de Clientes/Corretores/Corporações | `PCII_supervisor` | Seletor de qualquer entidade do tipo |
+| Administrador | `PCII_admin` | Portal de administração completo |
 
 ## Funcionalidades
 
@@ -69,6 +72,7 @@ Abrir em: http://127.0.0.1:5001
 - SQLite
 - Pandas
 - Plotly
+- bcrypt (hashing de passwords)
 
 ## Publicação
 

@@ -21,10 +21,10 @@
     <div class="header">
       <span class="risk-badge" style="background: {{ risk.cor }}">RISCO CORPORATIVO: {{ risk.nivel }}</span>
       <h1>{{ corp.name }}</h1>
-      {% if corp.comments %}
+      {% if risk_externo %}
       <div class="comments-box">
         <strong><img src="{{ url_for('static', filename='images/memo-1f4dd.png') }}" alt="Memo" class="emoji-icon">
-          Risco corporativo: {{ risk.nivel }}</strong><br />
+          Perfil de Risco Externo: {{ risk_externo }}</strong>
       </div>
       {% endif %}
       <p style="margin-top: 15px; font-size: 0.9em; color: #bdc3c7">

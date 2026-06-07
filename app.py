@@ -435,6 +435,13 @@ def corporation_dashboard(id):
     else:
         corp_risk = {'nivel': 'ESTÁVEL', 'cor': '#27ae60', 'msg': 'A estrutura de brokers está saudável e diversificada.'}
 
+    mapping_externo = {'high': 'ALTO', 'medium': 'MÉDIO', 'low': 'BAIXO'}
+    risk_externo = ''
+    if getattr(corp, 'comments', None):
+        m = re.search(r'Risk\s*profile\s*:\s*(High|Medium|Low)', corp.comments, re.IGNORECASE)
+        if m:
+            risk_externo = mapping_externo.get(m.group(1).lower(), '')
+
     df_plot = pd.DataFrame([{'Corretor': s['obj'].name, 'AUM': s['aum']} for s in broker_stats if s['aum'] > 0])
     if not df_plot.empty:
         fig = px.pie(df_plot, values='AUM', names='Corretor', title='Distribuição de Volume por Corretor', hole=0.4)
@@ -450,6 +457,7 @@ def corporation_dashboard(id):
                            avg_ticket=avg_ticket,
                            num_brokers=len(corp_brokers),
                            risk=corp_risk,
+                           risk_externo=risk_externo,
                            graph_html=graph_html,
                            brokers=broker_stats)
 
