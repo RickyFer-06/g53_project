@@ -309,10 +309,9 @@
   <script>
     function confirmarRemocao(form, tipo) {
       const select = form.querySelector('select');
+      if (!select || select.selectedIndex < 0) return false;
       const nome = select.options[select.selectedIndex].text;
-      return confirm('Remover "' + nome + '"?
-
-Esta ação apagará permanentemente a ' + tipo + '.');
+      return confirm('Remover "' + nome + '"?\n\nEsta ação apagará permanentemente a ' + tipo + '.');
     }
   </script>
 </body>
